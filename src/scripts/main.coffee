@@ -38,6 +38,8 @@ class ViewFieldView extends Backbone.View
         .data('cid', @model.cid)
         .html(Formbuilder.templates["view/base#{if !@model.is_input() then '_non_input' else ''}"]({rf: @model}))
 
+    @setSortable() if @model.get(Formbuilder.options.mappings.CONTAINER)
+
     return @
 
   focusEditView: ->
@@ -66,6 +68,37 @@ class ViewFieldView extends Backbone.View
     delete attrs['id']
     attrs['label'] += ' Copy'
     @parentView.createField attrs, { position: @model.indexInDOM() + 1 }
+
+  setSortable: ->
+    @parentView.$responseFields.sortable('destroy') if @parentView.$responseFields.hasClass('ui-sortable')
+    @parentView.$responseFields.sortable
+      forcePlaceholderSize: true
+      placeholder: 'sortable-placeholder'
+      stop: (e, ui) =>
+        if ui.item.data('field-type')
+          rf = @parentView.collection.create Formbuilder.helpers.defaultFieldAttrs(ui.item.data('field-type')), {$replaceEl: ui.item}
+          @createAndShowEditView(rf)
+
+        @handleFormUpdate()
+        return true
+      update: (e, ui) =>
+        # ensureEditViewScrolled, unless we're updating from the draggable
+        @parentView.ensureEditViewScrolled() unless ui.item.data('field-type')
+
+    @setDraggable()
+
+  setDraggable: ->
+    $addFieldButtons = @parentView.$el.find("[data-field-type]")
+
+    $addFieldButtons.draggable
+      connectToSortable: @parentView.$responseFields
+      helper: =>
+        $helper = $("<div class='response-field-draggable-helper' />")
+        $helper.css
+          width: @parentView.$responseFields.width() # hacky, won't get set without inline style
+          height: '80px'
+
+        $helper
 
 
 class EditFieldView extends Backbone.View
@@ -210,6 +243,7 @@ class BuilderView extends Backbone.View
       @createAndShowEditView(first_model)
 
   addOne: (responseField, _, options) ->
+
     view = new ViewFieldView
       model: responseField
       parentView: @
@@ -361,6 +395,7 @@ class Formbuilder
       attrs[Formbuilder.options.mappings.LABEL] = 'Untitled'
       attrs[Formbuilder.options.mappings.FIELD_TYPE] = field_type
       attrs[Formbuilder.options.mappings.REQUIRED] = true
+      attrs[Formbuilder.options.mappings.CONTAINER] = false
       attrs['field_options'] = {}
       Formbuilder.fields[field_type].defaultAttributes?(attrs) || attrs
 
@@ -391,6 +426,7 @@ class Formbuilder
       MINLENGTH: 'field_options.minlength'
       MAXLENGTH: 'field_options.maxlength'
       LENGTH_UNITS: 'field_options.min_max_length_units'
+      CONTAINER: 'container'
 
     dict:
       ALL_CHANGES_SAVED: 'All changes saved'

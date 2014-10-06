@@ -124,6 +124,9 @@
       this.$el.addClass('response-field-' + this.model.get(Formbuilder.options.mappings.FIELD_TYPE)).data('cid', this.model.cid).html(Formbuilder.templates["view/base" + (!this.model.is_input() ? '_non_input' : '')]({
         rf: this.model
       }));
+      if (this.model.get(Formbuilder.options.mappings.CONTAINER)) {
+        this.setSortable();
+      }
       return this;
     };
 
@@ -161,6 +164,52 @@
       attrs['label'] += ' Copy';
       return this.parentView.createField(attrs, {
         position: this.model.indexInDOM() + 1
+      });
+    };
+
+    ViewFieldView.prototype.setSortable = function() {
+      var _this = this;
+      if (this.parentView.$responseFields.hasClass('ui-sortable')) {
+        this.parentView.$responseFields.sortable('destroy');
+      }
+      this.parentView.$responseFields.sortable({
+        forcePlaceholderSize: true,
+        placeholder: 'sortable-placeholder',
+        stop: function(e, ui) {
+          var rf;
+          if (ui.item.data('field-type')) {
+            rf = _this.parentView.collection.create(Formbuilder.helpers.defaultFieldAttrs(ui.item.data('field-type')), {
+              $replaceEl: ui.item
+            });
+            _this.createAndShowEditView(rf);
+          }
+          _this.handleFormUpdate();
+          return true;
+        },
+        update: function(e, ui) {
+          if (!ui.item.data('field-type')) {
+            return _this.parentView.ensureEditViewScrolled();
+          }
+        }
+      });
+      return this.setDraggable();
+    };
+
+    ViewFieldView.prototype.setDraggable = function() {
+      var $addFieldButtons,
+        _this = this;
+      $addFieldButtons = this.parentView.$el.find("[data-field-type]");
+      return $addFieldButtons.draggable({
+        connectToSortable: this.parentView.$responseFields,
+        helper: function() {
+          var $helper;
+          $helper = $("<div class='response-field-draggable-helper' />");
+          $helper.css({
+            width: _this.parentView.$responseFields.width(),
+            height: '80px'
+          });
+          return $helper;
+        }
       });
     };
 
@@ -557,6 +606,7 @@
         attrs[Formbuilder.options.mappings.LABEL] = 'Untitled';
         attrs[Formbuilder.options.mappings.FIELD_TYPE] = field_type;
         attrs[Formbuilder.options.mappings.REQUIRED] = true;
+        attrs[Formbuilder.options.mappings.CONTAINER] = false;
         attrs['field_options'] = {};
         return (typeof (_base = Formbuilder.fields[field_type]).defaultAttributes === "function" ? _base.defaultAttributes(attrs) : void 0) || attrs;
       },
@@ -587,7 +637,8 @@
         MAX: 'field_options.max',
         MINLENGTH: 'field_options.minlength',
         MAXLENGTH: 'field_options.maxlength',
-        LENGTH_UNITS: 'field_options.min_max_length_units'
+        LENGTH_UNITS: 'field_options.min_max_length_units',
+        CONTAINER: 'container'
       },
       dict: {
         ALL_CHANGES_SAVED: 'All changes saved',
@@ -715,6 +766,20 @@
     view: "<input type='text' class='rf-size-<%= rf.get(Formbuilder.options.mappings.SIZE) %>' />",
     edit: "",
     addButton: "<span class=\"symbol\"><span class=\"fa fa-envelope-o\"></span></span> Email"
+  });
+
+}).call(this);
+
+(function() {
+  Formbuilder.registerField('fieldset', {
+    order: 55,
+    view: "<fieldset id=\"<%= rf.get('cid') %>\" class='fb-response-fields'></fieldset>",
+    edit: "",
+    addButton: "<span class=\"symbol\"><span class=\"fa fa-home\"></span></span> FieldSet",
+    defaultAttributes: function(attrs) {
+      attrs.container = true;
+      return attrs;
+    }
   });
 
 }).call(this);
